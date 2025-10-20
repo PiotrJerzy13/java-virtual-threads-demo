@@ -6,9 +6,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.web.embedded.tomcat.TomcatProtocolHandlerCustomizer;
 
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 
 @SpringBootApplication
@@ -29,7 +29,7 @@ public class DemoApplication {
     private volatile Mode mode = Mode.PLATFORM;
     private final Metrics metrics = new Metrics();
 
-    public static void main(String[] args) {
+    void main(String[] args) {
         SpringApplication.run(DemoApplication.class, args);
     }
 
@@ -37,11 +37,11 @@ public class DemoApplication {
     @GetMapping("/mode/{m}")
     public String setMode(@PathVariable String m) {
         mode = Mode.valueOf(m.toUpperCase());
-        return "mode=" + mode;
+        return STR."mode=\{mode}";
     }
 
     @GetMapping("/mode")
-    public String getMode() { return "mode=" + mode; }
+    public String getMode() { return STR."mode=\{mode}"; }
 
     // Work simulation
     @GetMapping("/sleep")
@@ -53,7 +53,7 @@ public class DemoApplication {
                     Thread.sleep(ms);
                     return ok("slept-platform", ms);
                 });
-                yield metrics.timed(() -> future.get());
+                yield metrics.timed(future::get);
             }
 
             case CUSTOM -> {
@@ -61,7 +61,7 @@ public class DemoApplication {
                     Thread.sleep(ms);
                     return ok("slept-custom", ms);
                 });
-                yield metrics.timed(() -> future.get());
+                yield metrics.timed(future::get);
             }
 
             case VIRTUAL -> metrics.timed(() -> {
@@ -94,11 +94,6 @@ public class DemoApplication {
         return kind + " " + ms + " ms on " + Thread.currentThread();
     }
 
-    static void busy(Duration d) {
-        long end = System.nanoTime() + d.toNanos();
-        while (System.nanoTime() < end) {}
-    }
-
     // ---- Metrics collector ----
     static class Metrics {
         private final LongAdder inflight = new LongAdder();
@@ -107,7 +102,8 @@ public class DemoApplication {
 
         private final int N = 4096;
         private final long[] lat = new long[N];
-        private volatile int idx = 0;
+        private final AtomicInteger idx = new AtomicInteger(0);
+
 
         private volatile long lastTick = System.nanoTime();
         private volatile long lastCount = 0;
@@ -124,7 +120,7 @@ public class DemoApplication {
                 inflight.decrement();
                 total.increment();
                 long dur = System.nanoTime() - start;
-                lat[idx++ & (N - 1)] = dur;
+                lat[idx.getAndIncrement() & (N - 1)] = dur;
                 long now = System.nanoTime();
                 if (now - lastTick >= TimeUnit.SECONDS.toNanos(1)) {
                     long count = total.sum();
@@ -171,7 +167,7 @@ public class DemoApplication {
             ok.reset();
             total.reset();
             Arrays.fill(lat, 0);
-            idx = 0;
+            idx.set(0);
             lastTick = System.nanoTime();
             lastCount = 0;
             rps = 0.0;
