@@ -29,7 +29,7 @@ public class DemoApplication {
     private volatile Mode mode = Mode.PLATFORM;
     private final Metrics metrics = new Metrics();
 
-    void main(String[] args) {
+    public static void main(String[] args) {
         SpringApplication.run(DemoApplication.class, args);
     }
 
@@ -37,11 +37,11 @@ public class DemoApplication {
     @GetMapping("/mode/{m}")
     public String setMode(@PathVariable String m) {
         mode = Mode.valueOf(m.toUpperCase());
-        return STR."mode=\{mode}";
+        return "mode=" + mode;
     }
 
     @GetMapping("/mode")
-    public String getMode() { return STR."mode=\{mode}"; }
+    public String getMode() { return "mode=" + mode; }
 
     // Work simulation
     @GetMapping("/sleep")
